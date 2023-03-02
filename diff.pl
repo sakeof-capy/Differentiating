@@ -33,7 +33,7 @@ d(U^C,X,C*U^(C-1)*W):-atomic(C),C\=X,d(U,X,W).
 %d(lnU)/dx -> U^(-1)(dU/dx) 
 d(log(U),X,A*U^(-1)):-d(U,X,A).
 
-d(U(V))/dx -> (dV/dU)*dU/dx
+%d(U(V))/dx -> (dV/dU)*dU/dx
 d(U_V_X,X,DV*DU):-
   U_V_X=..[U,V_X],
   d(U_V_X,V_X,DU),
