@@ -123,7 +123,7 @@ s(^,0,_,0).
 s(^,1,_,1).
 s(^,_,0,1).
 s(^,X,1,X).
-s(^,X,C,1/(X^P)):-C<0,P is -C.
+s(^,X,C,1/(X^P)):-number(C),C<0,P is -C.
 s(^,X,Y,X^Y).
 s(^,X,Y,Z):-number(X),number(Y),Z is truncate(X**Y).
 
