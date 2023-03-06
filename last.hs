@@ -1,78 +1,62 @@
-import Data.Char
+module Math where
 
-data Expr = Func String Expr
-          | Add Expr Expr
-          | Sub Expr Expr
-          | Mul Expr Expr
-          | Div Expr Expr
-          | Pow Expr Expr
-          | Neg Expr
-          | Var String
-          | Num Double
-          deriving Show
+-- | An algebraic expression, e.g. 2j^k + -4l^2 + -m + log_2(n), which ends up looking like this:
+-- Add [
+--   Mult [Coeff 2, Exp (Var "j") (Var "k")],
+--   Mult [Coeff -4, Exp (Var "l") (Coeff 2)],
+--   Mult [Coeff -1, Var "m"],
+--   Log 2 (Var "n")
+--   ]
+data AlgExpr =
+  Coeff Rational |      -- ^ Coefficient, e.g. -2
+  Var String |          -- ^ Variable, e.g. x
+  Mult [AlgExpr] |      -- ^ List to be multiplied, e.g. a*b*c*...
+  Add [AlgExpr] |       -- ^ List to be added, e.g. a+b+c+...
+  Exp AlgExpr AlgExpr | -- ^ Exponent, e.g. a^b
+  Log Rational AlgExpr  -- ^ Logarithm, e.g. log_2(b)
+  deriving (Eq)
 
-type Parser a = String -> Maybe (a, String)
+instance Show AlgExpr where
+  show (Coeff c    ) = show (fromRational c)
+  show (Var v      ) = v
+  show (Mult []    ) = show ""
+  show (Mult (e:[])) = show e
+  show (Mult (e:es)) = (show e) ++ "⋅" ++ (show (Mult es))
+  show (Add []     ) = show ""
+  show (Add (e:[]) ) = show e
+  show (Add (e:es) ) = (show e) ++ " + " ++ (show (Add es))
+  show (Exp b e    ) = (show b) ++ "^(" ++ show e ++ ")"
+  show (Log b e    ) = "log_" ++ (show (fromRational b)) ++ "(" ++ (show e) ++ ")"
 
-parse :: String -> Maybe Expr
-parse s = case expr s of
-            Just (e, "") -> Just e
-            _ -> Nothing
+-- | Squashes algebraic expressions in an ugly way. WIP!
+simplify :: AlgExpr -> AlgExpr
+simplify (Mult es) = Mult (map (\e -> simplify e) (simplifyMultCoeff (simplifyMultFlatten es []) 1))
+simplify (Exp b e) = simplifyExpLog (Exp (simplify b) (simplify e))
+simplify (Log b e) = simplifyLogExp (Log b (simplify e))
+simplify e = e
 
-expr :: Parser Expr
-expr s = case term s of
-           Just (e1, s') -> rest e1 s'
-           Nothing -> Nothing
-  where rest e1 ('+':s') = case term s' of
-                             Just (e2, s'') -> rest (Add e1 e2) s''
-                             Nothing -> Nothing
-        rest e1 ('-':s') = case term s' of
-                             Just (e2, s'') -> rest (Sub e1 e2) s''
-                             Nothing -> Nothing
-        rest e s' = Just (e, s')
+-- | This applies the simplification log_a(b^c)) => c*log_a(b).
+simplifyLogExp :: AlgExpr -> AlgExpr
+simplifyLogExp (Log b (Exp bb ee)) = Mult [simplifyLogExp ee, Log b (simplifyLogExp bb)]
+simplifyLogExp (Log b (Mult es)) = Mult (map (\e -> simplifyLogExp (Log b e)) es)
+simplifyLogExp e = e
 
-term :: Parser Expr
-term s = case pow s of
-           Just (e1, s') -> rest e1 s'
-           Nothing -> Nothing
-  where rest e1 ('*':s') = case pow s' of
-                             Just (e2, s'') -> rest (Mul e1 e2) s''
-                             Nothing -> Nothing
-        rest e1 ('/':s') = case pow s' of
-                             Just (e2, s'') -> rest (Div e1 e2) s''
-                             Nothing -> Nothing
-        rest e s' = Just (e, s')
+-- | This applies the simplification a^(log_a(b)) => b.
+simplifyExpLog :: AlgExpr -> AlgExpr
+simplifyExpLog (Exp b (Log bb ee)) = if (b == (Coeff bb)) then (simplifyExpLog ee) else (Exp (simplifyExpLog b) (Log bb (simplifyExpLog ee)))
+simplifyExpLog (Exp b (Mult es)) = Mult (map (\e -> simplifyExpLog (Exp (simplifyExpLog b) e)) es)
+simplifyExpLog e = e
 
-pow :: Parser Expr
-pow s = case factor s of
-          Just (e1, s') -> rest e1 s'
-          Nothing -> Nothing
-  where rest e1 ('^':s') = case factor s' of
-                             Just (e2, s'') -> rest (Pow e1 e2) s''
-                             Nothing -> Nothing
-        rest e s' = Just (e, s')
+-- | This applies the simplification a*b*(c*(d*e)*f) => a*b*c*d*e*f. Note that it assumes the list
+-- of AlgExpr are to be multiplied together.
+simplifyMultFlatten :: [AlgExpr] -> [AlgExpr] -> [AlgExpr]
+simplifyMultFlatten ((Mult es):ess) acc = simplifyMultFlatten ess (simplifyMultFlatten es acc)
+simplifyMultFlatten (e:es) acc = e : (simplifyMultFlatten es acc)
+simplifyMultFlatten [] acc = acc
 
-factor :: Parser Expr
-factor ('-':s) = case factor s of
-                    Just (e, s') -> Just (Neg e, s')
-                    Nothing -> Nothing
-factor ('(':s) = case expr s of
-                    Just (e, ')':s') -> Just (e, s')
-                    _ -> Nothing
-factor s@(c:_) | isAlpha c = case function s of
-                                Just (e, s') -> Just (e, s')
-                                Nothing -> identifier s
-                | isDigit c = number s
-                | otherwise = Nothing
-
-function :: Parser Expr
-function s = case identifier s of
-               Just (Var name, '(':rest1) -> case expr rest1 of
-                                               Just (arg, ')':rest2) -> Just (Func name arg, rest2)
-                                               _ -> Nothing
-               _ -> Nothing
-
-identifier :: Parser Expr
-identifier s = Just (Var (takeWhile isAlphaNum s), dropWhile isAlphaNum s)
-
-number :: Parser Expr
-number s = Just (Num (read (takeWhile isDigit s)), dropWhile isDigit s)
+-- | This applies the simplification 2*x*3*y*4 => 24*x*y. Note that it assumes the list
+-- of AlgExpr are to be multiplied together.
+simplifyMultCoeff :: [AlgExpr] -> Rational -> [AlgExpr]
+simplifyMultCoeff ((Coeff n):es) acc = simplifyMultCoeff es (n * acc)
+simplifyMultCoeff (e:es) acc = e : (simplifyMultCoeff es acc)
+simplifyMultCoeff [] acc = [Coeff acc]
