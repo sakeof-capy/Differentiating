@@ -12,23 +12,45 @@ data Expr = Fun String Expr
           | Neg Expr
           | Var String
           | Num Double
-          deriving (Show, Eq)
+          deriving Eq
 
--- instance Eq Expr where
---   (Fun s1 e1) == (Fun s2 e2) = s1 == s2 && e1 == e2
---   (Add e1 e2) == (Add e3 e4) = (e1 == e3 && e2 == e4) || (e1 == e4 && e2 == e3)
---   (Sub e1 e2) == (Sub e3 e4) = e1 == e3 && e2 == e4
---   (Mul e1 e2) == (Mul e3 e4) = (e1 == e3 && e2 == e4) || (e1 == e4 && e2 == e3)
---   (Div e1 e2) == (Div e3 e4) = e1 == e3 && e2 == e4
---   (Pow e1 e2) == (Pow e3 e4) = e1 == e3 && e2 == e4
---   (Neg e1) == (Neg e2) = e1 == e2
---   (Var s1) == (Var s2) = s1 == s2
---   (Num d1) == (Num d2) = d1 == d2
---   _ == _ = False
+instance Show Expr where
+  show (Fun fnm ex1) = fnm ++ embrace ex1
+  show (Add ex1 ex2) = showDefaultParams " + " ex1 ex2
+  show (Sub ex1 ex2) = showDefaultParams " - " ex1 ex2
+  show (Mul ex1 ex2) = showMultDivParam ex1 ++ "*" ++ showMultDivParam ex2 
+  show (Div ex1 ex2) = showMultDivParam ex1 ++ "/" ++ showMultDivParam ex2
+  show (Pow ex1 ex2) = showPowParam ex1 ++ "^" ++ showPowParam ex2 
+  show (Neg ex1    ) = showNegParam ex1
+  show (Var v      ) = v
+  show (Num n      ) = show n
 
 type WholedExpr = Expr -> Expr
 type DiffTable = [(String, WholedExpr)]
 type Parser a = String -> Maybe (a, String)
+
+embrace :: Expr -> String
+embrace e = '(' : show e ++ ")"
+
+showDefaultParams :: String -> Expr -> Expr -> String
+showDefaultParams op ex1 ex2 = show(ex1) ++ op ++ show(ex2)
+
+showMultDivParam :: Expr -> String
+showMultDivParam (Add ex1 ex2) = embrace$ Add ex1 ex2
+showMultDivParam (Sub ex1 ex2) = embrace$ Sub ex1 ex2
+showMultDivParam e = show e
+
+showPowParam :: Expr -> String
+showPowParam (Var v) = show$ Var v
+showPowParam (Num n) = show$ Num n 
+showPowParam (Fun n e) = show$ Fun n e
+showPowParam (Pow a b) = show$ Pow a b
+showPowParam e = embrace e
+
+showNegParam :: Expr -> String
+showNegParam (Add ex1 ex2) = embrace$ Add ex1 ex2
+showNegParam (Sub ex1 ex2) = embrace$ Sub ex1 ex2
+showNegParam e = show$ e
 
 diffTable :: DiffTable
 diffTable = 
@@ -206,14 +228,12 @@ identifier s = Just (Var (takeWhile isAlphaNum s), dropWhile isAlphaNum s)
 number :: Parser Expr
 number s = Just (Num (read (takeWhile isDigit s)), dropWhile isDigit s)
 
-test :: String -> String -> String
-test str v = case parseIgnoreSpaces str of
-             Just ex -> toString$  simpl ex 
-             Nothing -> error "Parse error: Invalid expression."
+simplString :: String -> String
+simplString str = case parseIgnoreSpaces str of
+                      Just ex -> toString$  simpl ex 
+                      Nothing -> error "Parse error: Invalid expression."
 
 diffString :: String -> String -> String
 diffString str v = case parseIgnoreSpaces str of
-                     Just ex -> toString$ simpl$ diff ex v
+                     Just ex -> show$ simpl$ diff ex v
                      Nothing -> error "Parse error: Invalid expression."
-
-----------------------------------------------------------------------
