@@ -86,8 +86,7 @@ s(+,X,Y,X+Y).
 s(-,X,0,X).
 s(-,0,X,-X).
 s(-,X,Y,Z):-number(X),number(Y),Z is X-Y.
-s(-,X+C1,C2,R):-number(C1),number(C2),C is C1-C2, s(+, X, C, R).
-s(-,C1+X,C2,R):-number(C1),number(C2),C is C1-C2, s(+, X, C, R).
+s(-,C1+X,C2,R):-number(C1),number(C2),C is C1-C2, s(+, C, X, R).
 s(-,C1*X,C2*X,R):-number(C1),number(C2),C is C1-C2, s(*, C, X, R).
 s(-,X*C1,C2*X,R):-number(C1),number(C2),C is C1-C2, s(*, C, X, R).
 s(-,C1*X,X*C2,R):-number(C1),number(C2),C is C1-C2, s(*, C, X, R).
@@ -101,9 +100,9 @@ s(*,1,X,X).
 s(*,X,1,X).
 s(*,-1,X,-X).
 s(*,X,-1,-X).
-s(*,X*Y,W,X*Z):-number(Y),number(W),Z is Y*W,!.
+s(*,X*C1,C2,R):-number(C1),number(C2),C is C1*C2,s(*,C,X,R).
+s(*,C1*X,C2,R):-number(C1),number(C2),C is C1*C2,s(*,C,X,R).
 s(*,X,Y,Z):-number(X),number(Y),Z is X*Y.
-s(*,C1*X,C2,R):-number(C1),number(C2),C is C1*C2, s(*,C,X,R).
 s(*,X,X,X^2).
 s(*,X,Y,X*Y).
 
@@ -112,15 +111,15 @@ s(/,X,1,X).
 s(/,X,C1,R):-number(C1),C is 1/C1,s(*,C,X,R).
 s(/,X,Y,Z):-number(X),number(Y),Y\=0,Z is X/Y.
 s(/,X,X,1):-X\=0.
-s(/,X,Y,X/Y) :- Y\=0.
+s(/,X,Y,X/Y):-Y\=0.
 
 s(^,0,_,0).
 s(^,1,_,1).
 s(^,_,0,1).
 s(^,X,1,X).
 s(^,X,C,1/R):-number(C),C<0,P is -C,s(^,X,P,R).
-s(^,X,Y,X^Y).
 s(^,X,Y,Z):-number(X),number(Y),Z is truncate(X**Y).
+s(^,X,Y,X^Y).
 
 s(-,C,Z):-number(C), Z is -C.
 s(-,-U,U).

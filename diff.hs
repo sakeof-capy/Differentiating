@@ -92,11 +92,24 @@ simpl (Add e1 e2) = case (simpl e1, simpl e2) of
                       (Num 0, e) -> e
                       (e, Num 0) -> e
                       (Num n1, Num n2) -> Num (n1 + n2)
+                      (Add (Num n1) (e1'), Num n2) ->
+                        simpl$ Add (Num (n1 + n2)) e1'
                       (Mul (Num n1) e1', Mul (Num n2) e2') -> 
                         if e1' == e2'
-                        then Mul (Num (n1 + n2)) e1'
+                        then simpl$ Mul (Num (n1 + n2)) e1'
                         else Add (Mul (Num n1) e1') (Mul (Num n2) e2')
-                      (e1', (Add e2' e3')) -> Add (Add e1' e2') e3'
+                      (Mul e1' (Num n1), Mul (Num n2) e2') -> 
+                        if e1' == e2'
+                        then simpl$ Mul (Num (n1 + n2)) e1'
+                        else Add (Mul (Num n1) e1') (Mul (Num n2) e2')
+                      (Mul (Num n1) e1', Mul e2' (Num n2)) -> 
+                        if e1' == e2'
+                        then simpl$ Mul (Num (n1 + n2)) e1'
+                        else Add (Mul (Num n1) e1') (Mul (Num n2) e2')
+                      (Mul e1' (Num n1), Mul e2' (Num n2)) -> 
+                        if e1' == e2'
+                        then simpl$ Mul (Num (n1 + n2)) e1'
+                        else Add (Mul (Num n1) e1') (Mul (Num n2) e2')
                       (e1', e2') -> 
                         if e1' == e2'
                         then Mul (Num 2.0) (e1')
@@ -105,54 +118,67 @@ simpl (Sub e1 e2) = case (simpl e1, simpl e2) of
                       (Num 0, e) -> Neg e
                       (e, Num 0) -> e
                       (Num n1, Num n2) -> Num (n1 - n2)
-                      (e1', e2') -> Sub e1' e2'
+                      (Mul (Num n1) e1', Mul (Num n2) e2') -> 
+                        if e1' == e2'
+                        then simpl$ Mul (Num (n1 - n2)) e1'
+                        else Sub (Mul (Num n1) e1') (Mul (Num n2) e2')
+                      (Mul e1' (Num n1), Mul (Num n2) e2') -> 
+                        if e1' == e2'
+                        then simpl$ Mul (Num (n1 - n2)) e1'
+                        else Sub (Mul (Num n1) e1') (Mul (Num n2) e2')
+                      (Mul (Num n1) e1', Mul e2' (Num n2)) -> 
+                        if e1' == e2'
+                        then simpl$ Mul (Num (n1 - n2)) e1'
+                        else Sub (Mul (Num n1) e1') (Mul (Num n2) e2')
+                      (Mul e1' (Num n1), Mul e2' (Num n2)) -> 
+                        if e1' == e2'
+                        then simpl$ Mul (Num (n1 - n2)) e1'
+                        else Sub (Mul (Num n1) e1') (Mul (Num n2) e2')
+                      (e1', e2') -> 
+                        if e1' == e2'
+                        then Num 0.0
+                        else Sub e1' e2'
 simpl (Mul e1 e2) = case (simpl e1, simpl e2) of
                       (Num 0, _) -> Num 0
                       (_, Num 0) -> Num 0
                       (Num 1, e) -> e
                       (e, Num 1) -> e
+                      (Num (-1), e) -> Neg e 
+                      (e, Num (-1)) -> Neg e
+                      (Mul e2' (Num n1), Num n2) -> simpl$ Mul e2' (Num (n1*n2))
+                      (Mul (Num n1) e1', Num n2) -> simpl$ Mul (Num (n1*n2)) e1'
                       (Num n1, Num n2) -> Num (n1 * n2)
-                      (Var v, Num n) -> Mul (Num n) (Var v)
-                      (Pow (Var v) (Num p), Num n) -> Mul (Num n) (Pow (Var v) (Num p))
-                      --(e1', Add e2' e3') -> Add (simpl$ Mul e1' e2') (simpl$ Mul e1' e3')
-                      --(Add e2' e3', e1') -> Add (simpl$ Mul e1' e2') (simpl$ Mul e1' e3')
                       (e1', e2') -> 
                         if e1' == e2'
                         then Pow e1' (Num 2.0)
                         else Mul e1' e2'
-simpl (Div e1 e2) = case (simpl e1, simpl e2) of
-                      (_, Num 0) -> error "Division by zero!"
-                      (Num 0, _) -> Num 0
-                      (Num n1, Num n2) -> Num (n1 / n2)
-                      (e1', e2') -> if e1' == e2'
-                                    then Num 1
-                                    else Div e1' e2'
+simpl (Div e1 e2) = if(right == Num 0.0) 
+                    then error "Division by zero!"
+                    else case (simpl e1, right) of
+                           (Num 0, _) -> Num 0
+                           (Num n1, Num n2) -> Num (n1 / n2)
+                           (ex, Num n) -> simpl$ Mul (Num$ 1/n) ex
+                           (e1', e2') -> if e1' == e2'
+                                         then Num 1
+                                         else Div e1' e2'
+    where right = simpl e2
 simpl (Pow e1 e2) = case (simpl e1, simpl e2) of
                       (_, Num 0) -> Num 1
                       (Num 0, _) -> Num 0
                       (Num 1, _) -> Num 1
                       (_, Num 1) -> e1
+                      (e1', Num n) ->
+                        if n < 0
+                        then Div (Num 1) (Pow e1' (Num (-n)))
+                        else Pow e1' (Num n)
                       (Num n1, Num n2) -> Num (n1 ** n2)
                       (e1', e2') -> Pow e1' e2'
 simpl (Neg e1)    = case simpl e1 of
                       Num n -> Num $ -n
+                      Neg e -> e
                       e1'   -> Neg e1'
-simpl v@(Var _)   = v  
-simpl n@(Num _)   = n
 simpl (Fun f arg) = Fun f $ simpl arg
-
-
-toString :: Expr -> String
-toString (Fun nam ex2) = nam ++ "(" ++ toString ex2 ++ ")"
-toString (Add ex1 ex2) = '(' : toString (ex1) ++ " + " ++ toString(ex2) ++ ")"
-toString (Sub ex1 ex2) = '(' : toString (ex1) ++ " - " ++ toString(ex2) ++ ")"
-toString (Mul ex1 ex2) = toString (ex1) ++ "*" ++ toString(ex2)
-toString (Div ex1 ex2) = toString (ex1) ++ "/" ++ toString(ex2)
-toString (Pow ex1 ex2) = toString (ex1) ++ "^" ++ toString(ex2)
-toString (Neg ex1)     = '-' : '(' : toString (ex1) ++ ")"
-toString (Var v)       = v
-toString (Num n)       = show n
-
+simpl e           = e  
 
 --------------
 
@@ -230,7 +256,7 @@ number s = Just (Num (read (takeWhile isDigit s)), dropWhile isDigit s)
 
 simplString :: String -> String
 simplString str = case parseIgnoreSpaces str of
-                      Just ex -> toString$  simpl ex 
+                      Just ex -> show$  simpl ex 
                       Nothing -> error "Parse error: Invalid expression."
 
 diffString :: String -> String -> String
